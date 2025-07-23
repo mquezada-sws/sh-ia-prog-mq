@@ -1,0 +1,111 @@
+sequenceDiagram
+    participant User as Usuario
+    participant WebApp as Aplicación Web
+    participant Gateway as API Gateway
+    participant Auth as Auth Service
+    participant Search as Search Service
+    participant Inventory as Inventory Service
+    participant Reservation as Reservation Service
+    participant Payment as Payment Service
+    participant Notification as Notification Service
+    participant Cache as Redis Cache
+    participant Queue as Message Queue
+    participant ExtPay as Payment Gateway
+
+    Note over User, ExtPay: Proceso de Reservación de Habitación
+
+    %% 1. Búsqueda de habitaciones
+    User->>WebApp: Buscar habitaciones (ubicación, fechas, huéspedes)
+    WebApp->>Gateway: GET /api/search/rooms
+    Gateway->>Auth: Validar token (opcional)
+    Auth-->>Gateway: Token válido
+    Gateway->>Search: searchRooms(criteria)
+    
+    Search->>Cache: Verificar cache de búsqueda
+    alt Cache hit
+        Cache-->>Search: Resultados en cache
+    else Cache miss
+        Search->>Inventory: getAvailableRooms(criteria)
+        Inventory-->>Search: Lista de habitaciones disponibles
+        Search->>Cache: Guardar resultados en cache
+    end
+    
+    Search-->>Gateway: Resultados de búsqueda
+    Gateway-->>WebApp: Lista de habitaciones
+    WebApp-->>User: Mostrar habitaciones disponibles
+
+    %% 2. Selección y inicio de reserva
+    User->>WebApp: Seleccionar habitación
+    WebApp->>Gateway: POST /api/reservations/initiate
+    Gateway->>Auth: Validar autenticación
+    Auth-->>Gateway: Usuario autenticado
+    
+    Gateway->>Reservation: initiateReservation(roomId, userId, dates)
+    Reservation->>Inventory: checkAvailability(roomId, dates)
+    Inventory-->>Reservation: Habitación disponible
+    
+    Reservation->>Reservation: Crear reserva temporal (15 min TTL)
+    Reservation-->>Gateway: Reserva temporal creada
+    Gateway-->>WebApp: ID de reserva temporal
+    WebApp-->>User: Formulario de confirmación
+
+    %% 3. Confirmación de datos
+    User->>WebApp: Confirmar datos de reserva
+    WebApp->>Gateway: POST /api/reservations/confirm
+    Gateway->>Reservation: confirmReservation(reservationId, guestData)
+    
+    Reservation->>Inventory: lockRoom(roomId, dates)
+    Inventory-->>Reservation: Habitación bloqueada
+    
+    Reservation->>Reservation: Actualizar estado a "PENDING_PAYMENT"
+    Reservation-->>Gateway: Reserva confirmada, pendiente pago
+    Gateway-->>WebApp: Datos de pago requeridos
+    WebApp-->>User: Formulario de pago
+
+    %% 4. Procesamiento de pago
+    User->>WebApp: Introducir datos de pago
+    WebApp->>Gateway: POST /api/payments/process
+    Gateway->>Payment: processPayment(reservationId, paymentData)
+    
+    Payment->>ExtPay: Procesar pago con gateway externo
+    ExtPay-->>Payment: Pago exitoso / Pago fallido
+    
+    alt Pago exitoso
+        Payment->>Queue: Publicar evento PAYMENT_SUCCESS
+        Payment-->>Gateway: Pago confirmado
+        
+        %% Procesar evento de pago exitoso
+        Queue->>Reservation: Evento PAYMENT_SUCCESS
+        Reservation->>Reservation: Actualizar estado a "CONFIRMED"
+        Reservation->>Queue: Publicar evento RESERVATION_CONFIRMED
+        
+        Queue->>Inventory: Evento RESERVATION_CONFIRMED
+        Inventory->>Inventory: Confirmar reserva en inventario
+        Inventory->>Cache: Invalidar cache de disponibilidad
+        
+        Queue->>Notification: Evento RESERVATION_CONFIRMED
+        Notification->>Notification: Preparar confirmación
+        Notification-->>User: Email/SMS de confirmación
+        
+        Gateway-->>WebApp: Pago exitoso
+        WebApp-->>User: Reserva confirmada exitosamente
+        
+    else Pago fallido
+        Payment->>Queue: Publicar evento PAYMENT_FAILED
+        Payment-->>Gateway: Error en pago
+        
+        Queue->>Reservation: Evento PAYMENT_FAILED
+        Reservation->>Reservation: Actualizar estado a "CANCELLED"
+        Reservation->>Inventory: unlockRoom(roomId, dates)
+        Inventory->>Cache: Invalidar cache de disponibilidad
+        
+        Gateway-->>WebApp: Error en pago
+        WebApp-->>User: Error - intentar nuevamente
+    end
+
+    %% 5. Notificaciones adicionales
+    Note over Notification: Envío de notificaciones asíncronas
+    Notification->>User: Email con detalles de reserva
+    Notification->>User: SMS con código de confirmación
+
+    Note over User, ExtPay: Reservación completada exitosamente

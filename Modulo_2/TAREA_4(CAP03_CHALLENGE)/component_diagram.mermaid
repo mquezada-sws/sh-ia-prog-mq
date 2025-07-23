@@ -1,0 +1,123 @@
+graph TD
+    subgraph "Presentation Layer"
+        WebApp[<<component>><br/>Web Application<br/>React/Angular]
+        MobileApp[<<component>><br/>Mobile Application<br/>React Native/Flutter]
+        AdminPanel[<<component>><br/>Admin Panel<br/>React/Vue]
+    end
+
+    subgraph "API Gateway"
+        Gateway[<<component>><br/>API Gateway<br/>Kong/Nginx]
+        AuthMiddleware[<<component>><br/>Authentication<br/>Middleware]
+        RateLimit[<<component>><br/>Rate Limiting<br/>Middleware]
+    end
+
+    subgraph "Core Services"
+        UserMgmt[<<component>><br/>User Management<br/>Service]
+        AuthService[<<component>><br/>Authentication<br/>Service]
+        SearchEngine[<<component>><br/>Search Engine<br/>Service]
+        ReservationMgmt[<<component>><br/>Reservation<br/>Management]
+        InventoryMgmt[<<component>><br/>Inventory<br/>Management]
+        PaymentProc[<<component>><br/>Payment<br/>Processing]
+        NotificationSvc[<<component>><br/>Notification<br/>Service]
+        HotelMgmt[<<component>><br/>Hotel Management<br/>Service]
+        ReviewSvc[<<component>><br/>Review & Rating<br/>Service]
+    end
+
+    subgraph "Data Access Layer"
+        UserRepo[<<component>><br/>User Repository<br/>ORM/DAO]
+        ReservationRepo[<<component>><br/>Reservation Repository<br/>ORM/DAO]
+        InventoryRepo[<<component>><br/>Inventory Repository<br/>ORM/DAO]
+        PaymentRepo[<<component>><br/>Payment Repository<br/>ORM/DAO]
+        HotelRepo[<<component>><br/>Hotel Repository<br/>ORM/DAO]
+        ReviewRepo[<<component>><br/>Review Repository<br/>ORM/DAO]
+    end
+
+    subgraph "Data Storage"
+        UserDB[<<database>><br/>User Database<br/>PostgreSQL]
+        ReservationDB[<<database>><br/>Reservation Database<br/>PostgreSQL]
+        InventoryDB[<<database>><br/>Inventory Database<br/>MongoDB]
+        PaymentDB[<<database>><br/>Payment Database<br/>PostgreSQL]
+        HotelDB[<<database>><br/>Hotel Database<br/>PostgreSQL]
+        ReviewDB[<<database>><br/>Review Database<br/>MongoDB]
+        CacheDB[<<database>><br/>Cache Database<br/>Redis]
+    end
+
+    subgraph "External Integrations"
+        PaymentGW[<<component>><br/>Payment Gateway<br/>Stripe/PayPal API]
+        EmailSvc[<<component>><br/>Email Service<br/>SendGrid API]
+        SMSSvc[<<component>><br/>SMS Service<br/>Twilio API]
+        MapsSvc[<<component>><br/>Maps Service<br/>Google Maps API]
+    end
+
+    subgraph "Infrastructure"
+        MessageQueue[<<component>><br/>Message Queue<br/>RabbitMQ/Kafka]
+        Logger[<<component>><br/>Logging Service<br/>ELK Stack]
+        Monitor[<<component>><br/>Monitoring<br/>Prometheus/Grafana]
+    end
+
+    %% Presentation to Gateway
+    WebApp -->|HTTPS/REST| Gateway
+    MobileApp -->|HTTPS/REST| Gateway
+    AdminPanel -->|HTTPS/REST| Gateway
+
+    %% Gateway components
+    Gateway --> AuthMiddleware
+    Gateway --> RateLimit
+
+    %% Gateway to Services
+    Gateway -->|gRPC/HTTP| UserMgmt
+    Gateway -->|gRPC/HTTP| AuthService
+    Gateway -->|gRPC/HTTP| SearchEngine
+    Gateway -->|gRPC/HTTP| ReservationMgmt
+    Gateway -->|gRPC/HTTP| InventoryMgmt
+    Gateway -->|gRPC/HTTP| PaymentProc
+    Gateway -->|gRPC/HTTP| NotificationSvc
+    Gateway -->|gRPC/HTTP| HotelMgmt
+    Gateway -->|gRPC/HTTP| ReviewSvc
+
+    %% Services to Repositories
+    UserMgmt --> UserRepo
+    ReservationMgmt --> ReservationRepo
+    InventoryMgmt --> InventoryRepo
+    PaymentProc --> PaymentRepo
+    HotelMgmt --> HotelRepo
+    ReviewSvc --> ReviewRepo
+
+    %% Repositories to Databases
+    UserRepo --> UserDB
+    ReservationRepo --> ReservationDB
+    InventoryRepo --> InventoryDB
+    PaymentRepo --> PaymentDB
+    HotelRepo --> HotelDB
+    ReviewRepo --> ReviewDB
+
+    %% Cache connections
+    SearchEngine --> CacheDB
+    InventoryMgmt --> CacheDB
+    UserMgmt --> CacheDB
+
+    %% External integrations
+    PaymentProc -->|REST API| PaymentGW
+    NotificationSvc -->|REST API| EmailSvc
+    NotificationSvc -->|REST API| SMSSvc
+    SearchEngine -->|REST API| MapsSvc
+    HotelMgmt -->|REST API| MapsSvc
+
+    %% Message Queue connections
+    ReservationMgmt -->|Publish/Subscribe| MessageQueue
+    PaymentProc -->|Publish/Subscribe| MessageQueue
+    NotificationSvc -->|Publish/Subscribe| MessageQueue
+    InventoryMgmt -->|Publish/Subscribe| MessageQueue
+
+    %% Infrastructure connections
+    UserMgmt --> Logger
+    ReservationMgmt --> Logger
+    InventoryMgmt --> Logger
+    PaymentProc --> Logger
+    NotificationSvc --> Logger
+    SearchEngine --> Logger
+    HotelMgmt --> Logger
+    ReviewSvc --> Logger
+
+    Gateway --> Monitor
+    MessageQueue --> Monitor

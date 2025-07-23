@@ -1,0 +1,91 @@
+stateDiagram-v2
+    [*] --> INITIATED : Usuario inicia búsqueda
+
+    state "Proceso de Búsqueda" as SearchProcess {
+        INITIATED --> SEARCHING : Criterios de búsqueda enviados
+        SEARCHING --> RESULTS_FOUND : Habitaciones encontradas
+        SEARCHING --> NO_RESULTS : Sin habitaciones disponibles
+        NO_RESULTS --> SEARCHING : Modificar criterios
+        RESULTS_FOUND --> ROOM_SELECTED : Usuario selecciona habitación
+    }
+
+    state "Proceso de Reservación" as ReservationProcess {
+        ROOM_SELECTED --> TEMPORARY_HOLD : Crear reserva temporal (15 min)
+        TEMPORARY_HOLD --> EXPIRED : Timeout sin acción
+        TEMPORARY_HOLD --> PENDING_CONFIRMATION : Usuario ingresa datos
+        PENDING_CONFIRMATION --> CONFIRMED : Datos validados
+        PENDING_CONFIRMATION --> CANCELLED : Usuario cancela
+        CONFIRMED --> PENDING_PAYMENT : Proceder al pago
+    }
+
+    state "Proceso de Pago" as PaymentProcess {
+        PENDING_PAYMENT --> PROCESSING_PAYMENT : Datos de pago enviados
+        PROCESSING_PAYMENT --> PAYMENT_SUCCESS : Pago aprobado
+        PROCESSING_PAYMENT --> PAYMENT_FAILED : Pago rechazado
+        PAYMENT_FAILED --> PENDING_PAYMENT : Reintentar pago
+        PAYMENT_FAILED --> CANCELLED : Demasiados intentos fallidos
+        PAYMENT_SUCCESS --> PAID : Pago confirmado
+    }
+
+    state "Estados Activos" as ActiveStates {
+        PAID --> CHECKED_IN : Cliente llega al hotel
+        PAID --> MODIFIED : Cliente solicita modificación
+        PAID --> CANCELLED_WITH_REFUND : Cancelación dentro del plazo
+        PAID --> CANCELLED_NO_REFUND : Cancelación fuera del plazo
+        
+        CHECKED_IN --> CHECKED_OUT : Cliente deja el hotel
+        CHECKED_IN --> NO_SHOW : Cliente no se presenta
+        
+        MODIFIED --> PAID : Modificación confirmada y pagada
+        MODIFIED --> CANCELLED : Cliente cancela modificación
+    }
+
+    state "Estados Finales" as FinalStates {
+        CHECKED_OUT --> COMPLETED : Estadía completada
+        COMPLETED --> REVIEWED : Cliente deja reseña
+        NO_SHOW --> COMPLETED : Proceso cerrado
+    }
+
+    %% Transiciones de cancelación/expiración desde cualquier estado
+    TEMPORARY_HOLD --> CANCELLED : Expiración automática
+    PENDING_CONFIRMATION --> CANCELLED : Timeout o cancelación manual
+    PENDING_PAYMENT --> CANCELLED : Timeout de pago
+    PROCESSING_PAYMENT --> CANCELLED : Error crítico
+    PAID --> CANCELLED_WITH_REFUND : Cancelación temprana
+    PAID --> CANCELLED_NO_REFUND : Cancelación tardía
+    MODIFIED --> CANCELLED : Cancelación durante modificación
+
+    %% Estados finales
+    EXPIRED --> [*]
+    CANCELLED --> [*]
+    CANCELLED_WITH_REFUND --> [*]
+    CANCELLED_NO_REFUND --> [*]
+    COMPLETED --> [*]
+    REVIEWED --> [*]
+
+    %% Notas sobre estados
+    note right of TEMPORARY_HOLD
+        TTL: 15 minutos
+        Habitación bloqueada temporalmente
+    end note
+
+    note right of PENDING_PAYMENT
+        TTL: 30 minutos
+        Datos de reserva confirmados
+    end note
+
+    note right of PROCESSING_PAYMENT
+        TTL: 5 minutos
+        Procesando con gateway externo
+    end note
+
+    note right of PAID
+        Reserva confirmada
+        Habitación reservada
+        Notificaciones enviadas
+    end note
+
+    note right of MODIFIED
+        Cambios en fechas/habitación
+        Puede requerir pago adicional
+    end note

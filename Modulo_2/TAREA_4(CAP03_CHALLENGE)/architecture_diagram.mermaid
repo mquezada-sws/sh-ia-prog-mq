@@ -1,0 +1,116 @@
+graph TB
+    subgraph "Frontend Layer"
+        WA[Web Application]
+        MA[Mobile Application]
+        AA[Admin Panel]
+    end
+
+    subgraph "API Gateway Layer"
+        AG[API Gateway]
+        LB[Load Balancer]
+    end
+
+    subgraph "Microservices Layer"
+        US[User Service]
+        AS[Auth Service]
+        SS[Search Service]
+        RS[Reservation Service]
+        IS[Inventory Service]
+        PS[Payment Service]
+        NS[Notification Service]
+        HMS[Hotel Management Service]
+        RS_REP[Review Service]
+    end
+
+    subgraph "Data Layer"
+        UDB[(User Database)]
+        RDB[(Reservation Database)]
+        IDB[(Inventory Database)]
+        PDB[(Payment Database)]
+        HDB[(Hotel Database)]
+        REVDB[(Review Database)]
+        CACHE[(Redis Cache)]
+    end
+
+    subgraph "External Services"
+        PG[Payment Gateway - Stripe/PayPal]
+        EMAIL[Email Service - SendGrid]
+        SMS[SMS Service - Twilio]
+        MAPS[Maps API - Google Maps]
+    end
+
+    subgraph "Message Queue"
+        MQ[Message Queue - RabbitMQ/Kafka]
+    end
+
+    subgraph "Monitoring & Logging"
+        LOG[Logging Service]
+        MON[Monitoring - Prometheus]
+        TRACE[Distributed Tracing - Jaeger]
+    end
+
+    %% Frontend to API Gateway
+    WA --> AG
+    MA --> AG
+    AA --> AG
+
+    %% API Gateway to Load Balancer
+    AG --> LB
+
+    %% Load Balancer to Services
+    LB --> US
+    LB --> AS
+    LB --> SS
+    LB --> RS
+    LB --> IS
+    LB --> PS
+    LB --> NS
+    LB --> HMS
+    LB --> RS_REP
+
+    %% Service to Database connections
+    US --> UDB
+    RS --> RDB
+    IS --> IDB
+    PS --> PDB
+    HMS --> HDB
+    RS_REP --> REVDB
+
+    %% Cache connections
+    SS --> CACHE
+    IS --> CACHE
+    US --> CACHE
+
+    %% External service connections
+    PS --> PG
+    NS --> EMAIL
+    NS --> SMS
+    SS --> MAPS
+    HMS --> MAPS
+
+    %% Message Queue connections
+    RS --> MQ
+    PS --> MQ
+    NS --> MQ
+    IS --> MQ
+
+    %% Inter-service communication
+    RS -.-> IS
+    RS -.-> PS
+    RS -.-> NS
+    SS -.-> IS
+    AS -.-> US
+
+    %% Monitoring connections
+    US --> LOG
+    RS --> LOG
+    IS --> LOG
+    PS --> LOG
+    NS --> LOG
+    HMS --> LOG
+    SS --> LOG
+    AS --> LOG
+    RS_REP --> LOG
+
+    LB --> MON
+    AG --> TRACE
